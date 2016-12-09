@@ -397,8 +397,8 @@ def get_affected_testfiles(files_changed):
         if os.path.splitext(changedfile_pathname)[1] not in supportfile_extensions:
             continue
         # We have a changed file that is a support file.
-        travis_root = os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests")
-        changed_file_repo_path = changedfile_pathname[len(travis_root):]
+        repo_root = os.path.abspath(os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests"))
+        changed_file_repo_path = changedfile_pathname[len(repo_root):]
         os.path.normpath(changed_file_repo_path)
         path_components = changed_file_repo_path.split(os.sep)[1:]
         top_level_subdir = changed_file_repo_path.split(os.sep)[1]
@@ -407,25 +407,25 @@ def get_affected_testfiles(files_changed):
             # This changed support file is in the repo root, so skip it
             # (because it's not part of any test).
             continue
-        for root, dirs, fnames in os.walk(os.path.join(travis_root, basedir)):
+        for root, dirs, fnames in os.walk(os.path.join(repo_root, basedir)):
             # Walk basedir looking for test files containing either the
             # relative filepath or absolute filepatch to the changed file.
             for fname in fnames:
-                testfile_travis_path = os.path.join(travis_root, root, fname)
+                testfile_full_path = os.path.join(repo_root, root, fname)
                 # Skip any file that's already in files_changed.
-                if testfile_travis_path in files_changed:
+                if testfile_full_path in files_changed:
                     continue
                 # Skip any file that's not a test file.
-                if os.path.splitext(testfile_travis_path)[1] not in testfile_extensions:
+                if os.path.splitext(testfile_full_path)[1] not in testfile_extensions:
                     continue
-                if not os.path.isfile(testfile_travis_path):
+                if not os.path.isfile(testfile_full_path):
                     continue
-                with open(testfile_travis_path, "r") as fh:
+                with open(testfile_full_path, "r") as fh:
                     file_contents = fh.read()
-                    curdir = os.path.dirname(testfile_travis_path)
+                    curdir = os.path.dirname(testfile_full_path)
                     changed_file_relpath = os.path.relpath(changedfile_pathname, curdir)
                     if changed_file_relpath in file_contents or changedfile_pathname in file_contents:
-                        affected_testfiles.append(testfile_travis_path)
+                        affected_testfiles.append(testfile_full_path)
     return affected_testfiles
 
 
