@@ -386,6 +386,8 @@ def get_files_changed():
 
 def get_affected_testfiles(files_changed):
     affected_testfiles = []
+    ignore_dirs = ["common", "conformance-checkers", "docs", "lint", "resources", "tools"]
+    ignore_dirs.extend(["__pycache__", "_certs"])
     # FIXME: treat ".xml" files as test files? or support files? or both? or neither?
     testfile_extensions = [".html", ".htm", ".xhtml", ".xht", ".xml", ".svg"]
     supportfile_extensions = [".js", ".json"]
@@ -401,14 +403,15 @@ def get_affected_testfiles(files_changed):
         changed_file_repo_path = changedfile_pathname[len(repo_root):]
         os.path.normpath(changed_file_repo_path)
         path_components = changed_file_repo_path.split(os.sep)[1:]
-        top_level_subdir = changed_file_repo_path.split(os.sep)[1]
-        basedir = top_level_subdir
         if len(path_components) < 2:
             # This changed support file is in the repo root, so skip it
             # (because it's not part of any test).
             continue
-        for root, dirs, fnames in os.walk(os.path.join(repo_root, basedir)):
-            # Walk basedir looking for test files containing either the
+        top_level_subdir = changed_file_repo_path.split(os.sep)[1]
+        if top_level_subdir in ignore_dirs:
+            continue
+        for root, dirs, fnames in os.walk(os.path.join(repo_root, top_level_subdir)):
+            # Walk top_level_subdir looking for test files containing either the
             # relative filepath or absolute filepatch to the changed file.
             for fname in fnames:
                 testfile_full_path = os.path.join(repo_root, root, fname)
