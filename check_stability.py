@@ -388,28 +388,28 @@ def get_affected_testfiles(files_changed):
     affected_testfiles = []
     ignore_dirs = ["common", "conformance-checkers", "docs", "lint", "resources", "tools"]
     ignore_dirs.extend(["__pycache__", "_certs"])
-    # FIXME: treat ".xml" files as test files? or support files? or both? or neither?
-    testfile_extensions = [".html", ".htm", ".xhtml", ".xht", ".xml", ".svg"]
-    supportfile_extensions = [".js", ".json"]
+    manifest_file = os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests", "MANIFEST.json")
+    with open(manifest_file, "r") as fh:
+        manifest_contents = fh.read()
     for changedfile_pathname in files_changed:
-        # Skip any changed file that is actually a test file.
-        if os.path.splitext(changedfile_pathname)[1] in testfile_extensions:
-            continue
-        # Skip any changed file that is not a support file.
-        if os.path.splitext(changedfile_pathname)[1] not in supportfile_extensions:
-            continue
-        # We have a changed file that is a support file.
         repo_root = os.path.abspath(os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests"))
         changed_file_repo_path = changedfile_pathname[len(repo_root):]
+        if changed_file_repo_path in manifest_contents:
+            # This changed file is actually a test, so skip it.
+            continue
         os.path.normpath(changed_file_repo_path)
         path_components = changed_file_repo_path.split(os.sep)[1:]
         if len(path_components) < 2:
-            # This changed support file is in the repo root, so skip it
+            # This changed file is in the repo root, so skip it
             # (because it's not part of any test).
             continue
         top_level_subdir = changed_file_repo_path.split(os.sep)[1]
         if top_level_subdir in ignore_dirs:
             continue
+        # OK, this changed file is the kind we care about: It's something
+        # other than a test (e.g., it's a .js or .json file), and it's
+        # somewhere down beneath one of the top-level "spec" directories.
+        # So now we try to find any tests that reference it.
         for root, dirs, fnames in os.walk(os.path.join(repo_root, top_level_subdir)):
             # Walk top_level_subdir looking for test files containing either the
             # relative filepath or absolute filepatch to the changed file.
@@ -419,7 +419,7 @@ def get_affected_testfiles(files_changed):
                 if testfile_full_path in files_changed:
                     continue
                 # Skip any file that's not a test file.
-                if os.path.splitext(testfile_full_path)[1] not in testfile_extensions:
+                if os.path.splitext(testfile_full_path)[1] not in manifest_contents:
                     continue
                 if not os.path.isfile(testfile_full_path):
                     continue
