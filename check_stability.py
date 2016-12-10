@@ -387,7 +387,6 @@ def get_files_changed():
 def get_affected_testfiles(files_changed):
     affected_testfiles = []
     ignore_dirs = ["common", "conformance-checkers", "docs", "lint", "resources", "tools"]
-    ignore_dirs.extend(["__pycache__", "_certs"])
     manifest_file = os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests", "MANIFEST.json")
     with open(manifest_file, "r") as fh:
         manifest_contents = fh.read()
