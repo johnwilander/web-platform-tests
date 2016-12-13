@@ -14,6 +14,7 @@ import zipfile
 from cStringIO import StringIO
 from collections import defaultdict
 from urlparse import urljoin
+from tools.manifest import manifest
 
 import requests
 
@@ -386,24 +387,25 @@ def get_files_changed():
 
 def get_affected_testfiles(files_changed):
     affected_testfiles = []
-    ignore_dirs = ["conformance-checkers", "docs"]
-    manifest_file = os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests", "MANIFEST.json")
-    with open(manifest_file, "r") as fh:
-        manifest_contents = fh.read()
-    for changedfile_pathname in files_changed:
-        repo_root = os.path.abspath(os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests"))
-        changed_file_repo_path = changedfile_pathname[len(repo_root):]
-        if changed_file_repo_path in manifest_contents:
-            # This changed file is actually a test, so skip it.
-            continue
+    all_tests = []
+    nontests_changed = set(files_changed)
+    repo_root = os.path.abspath(os.path.join(os.path.abspath(os.curdir), "w3c", "web-platform-tests"))
+    manifest_file = os.path.join(repo_root, "MANIFEST.json")
+    for test,_ in manifest.load(repo_root, manifest_file):
+        all_tests.append(os.path.join(repo_root, test))
+        if test in nontests_changed:
+            # Reduce the set of changed files to only non-tests.
+            nontests_changed.remove(test)
+    for changedfile_pathname in nontests_changed:
+        changed_file_repo_path = os.path.join(os.path.sep, os.path.relpath(changedfile_pathname, repo_root))
         os.path.normpath(changed_file_repo_path)
         path_components = changed_file_repo_path.split(os.sep)[1:]
         if len(path_components) < 2:
             # This changed file is in the repo root, so skip it
             # (because it's not part of any test).
             continue
-        top_level_subdir = changed_file_repo_path.split(os.sep)[1]
-        if top_level_subdir in ignore_dirs:
+        top_level_subdir = path_components[0]
+        if top_level_subdir in ["conformance-checkers", "docs"]:
             continue
         # OK, this changed file is the kind we care about: It's something
         # other than a test (e.g., it's a .js or .json file), and it's
@@ -413,20 +415,18 @@ def get_affected_testfiles(files_changed):
             # Walk top_level_subdir looking for test files containing either the
             # relative filepath or absolute filepatch to the changed file.
             for fname in fnames:
-                testfile_full_path = os.path.join(repo_root, root, fname)
-                # Skip any file that's already in files_changed.
+                testfile_full_path = os.path.join(root, fname)
+                # Skip any test file that's already in files_changed.
                 if testfile_full_path in files_changed:
                     continue
                 # Skip any file that's not a test file.
-                if os.path.splitext(testfile_full_path)[1] not in manifest_contents:
-                    continue
-                if not os.path.isfile(testfile_full_path):
+                if testfile_full_path not in all_tests:
                     continue
                 with open(testfile_full_path, "r") as fh:
                     file_contents = fh.read()
                     curdir = os.path.dirname(testfile_full_path)
-                    changed_file_relpath = os.path.relpath(changedfile_pathname, curdir)
-                    if changed_file_relpath in file_contents or changedfile_pathname in file_contents:
+                    changed_file_relpath = os.path.relpath(changedfile_pathname, curdir).replace(os.path.sep, "/")
+                    if changed_file_relpath in file_contents or changed_file_repo_path.replace(os.path.sep, "/") in file_contents:
                         affected_testfiles.append(testfile_full_path)
     return affected_testfiles
 
@@ -618,6 +618,9 @@ def main():
         logger.debug("Files changed:\n%s" % "".join(" * %s\n" % item for item in files_changed))
 
         affected_testfiles = get_affected_testfiles(files_changed)
+
+        logger.debug("Affected tests:\n%s" % "".join(" * %s\n" % item for item in affected_testfiles))
+
         files_changed.extend(affected_testfiles)
 
 
